@@ -1,1 +1,41 @@
+name: Clean expired HWIDs
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # uruchamiane codziennie o północy UTC
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Filter out expired HWIDs
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          TMP_FILE=$(mktemp)
+
+          while IFS= read -r line; do
+            HWID=$(echo "$line" | cut -d';' -f1)
+            EXPIRY=$(echo "$line" | cut -d';' -f2)
+
+            if [[ "$EXPIRY" > "$TODAY" ]]; then
+              echo "$line" >> $TMP_FILE
+            else
+              echo "Removing expired HWID: $HWID"
+            fi
+          done < allowed_hwids.txt
+
+          mv $TMP_FILE allowed_hwids.txt
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add allowed_hwids.txt
+          git commit -m "Remove expired HWIDs"
+          git push
+        continue-on-error: true
 
